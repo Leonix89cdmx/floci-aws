@@ -1,0 +1,11 @@
+# Estado de Floci: contiene secretos (Secrets Manager, IAM, claves EKS, TLS). NUNCA subir.
+floci-data/
+backups/
+*.tgz
+*.tar.gz
+
+# Credenciales / entorno local
+.env
+*.pem
+*.key
+kubeconfig*
