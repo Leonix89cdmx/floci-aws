@@ -14,7 +14,7 @@
 #
 # Uso:  ./start_aws_floci.sh
 #       FLOCI_DATA_DIR=/otra/ruta ./start_aws_floci.sh
-# Documentación: README.md y docs/INSTALACION-WSL.md
+# Documentación: README.md
 # =============================================================================
 set -euo pipefail
 
