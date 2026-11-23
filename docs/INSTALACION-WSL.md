@@ -194,7 +194,7 @@ sudo tar xzf /mnt/c/Users/Public/floci-data.tgz -C ~
 | Parar | `docker stop floci floci-aws-ui` |
 | Reiniciar | `docker restart floci` |
 | Logs | `docker logs -f floci` |
-| Datos en otra ruta | `FLOCI_DATA_DIR=/ruta ./start_aws_floci.sh` |
+| Datos en otra ruta | `export FLOCI_DATA_DIR=/ruta` en `~/.bashrc` (el script se detiene si no coincide con la del contenedor) |
 
 Los contenedores usan `--restart unless-stopped`, así que **arrancan solos con Docker Desktop**. Tras reiniciar Windows basta con abrir Docker Desktop. Si algo falla, ejecuta el script.
 

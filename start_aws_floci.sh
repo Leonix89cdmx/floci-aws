@@ -47,6 +47,12 @@ if docker network inspect "$NETWORK" >/dev/null 2>&1; then
 else
   docker network create "$NETWORK" >/dev/null && ok "Red $NETWORK creada"
 fi
+if exists floci; then
+  CUR_DATA=$(docker container inspect -f '{{range .Config.Env}}{{println .}}{{end}}' floci | sed -n 's/^FLOCI_STORAGE_HOST_PERSISTENT_PATH=//p')
+  if [ -n "$CUR_DATA" ] && [ "$CUR_DATA" != "$DATA_DIR" ]; then
+    fail "Floci usa los datos de $CUR_DATA, pero este script apunta a $DATA_DIR. Define FLOCI_DATA_DIR=$CUR_DATA (o 'docker rm -f floci' si quieres cambiar de carpeta)."
+  fi
+fi
 mkdir -p "$DATA_DIR" && ok "Datos persistentes en $DATA_DIR"
 
 # -----------------------------------------------------------------------------
@@ -146,15 +152,15 @@ CLUSTERS=$(aws eks list-clusters --query clusters --output text 2>/dev/null || t
 REPOS=$(aws ecr describe-repositories --query 'repositories[].repositoryName' --output text 2>/dev/null || true)
 info "ECR repos: ${REPOS:-ninguno} · EKS clusters: ${CLUSTERS:-ninguno}"
 
-cat <<'EOF'
+cat <<EOF
 
   Laboratorio AWS listo 🚀
     API AWS : http://localhost:4566
     Consola : http://localhost:4500
-    Datos   : ~/floci-data
+    Datos   : $DATA_DIR
 
   En tu terminal (si no lo hace ya tu ~/.bashrc):
-    eval "$(floci env)"
+    eval "\$(floci env)"
 
   ⚠️  No uses 'floci start': recrea Floci sin la red de ECR.
       Si lo hiciste por error, vuelve a ejecutar este script.
