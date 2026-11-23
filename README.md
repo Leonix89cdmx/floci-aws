@@ -22,7 +22,7 @@ chmod +x start_aws_floci.sh
 
 El script es **idempotente**. Crea la red `floci-net`, la carpeta de datos y los contenedores, y arranca lo que esté parado. Si algo está mal configurado, lo recrea sin borrar los datos. Al final verifica que todo responde.
 
-Para instalarlo en un equipo nuevo con Windows + WSL2, ve a **[docs/INSTALACION-WSL.md](docs/INSTALACION-WSL.md)**.
+Para instalar desde cero en un equipo nuevo con Windows + WSL2 (incluye Docker y Floci), ve a **[docs/INSTALACION-WSL.md](docs/INSTALACION-WSL.md)**.
 
 ## Conectar la AWS CLI
 

@@ -33,23 +33,67 @@ wsl --set-default-version 2
 
 ---
 
-## 2. Instalar Docker Desktop (en Windows)
+## 2. Instalar Docker
 
-1. Descarga e instala **Docker Desktop**: https://www.docker.com/products/docker-desktop/
+Floci corre en Docker y crea contenedores reales (ECR, EKS, RDS), así que Docker es obligatorio. Elige **una** de las dos opciones.
+
+### Opción A — Docker Desktop (recomendada; es la que usa el equipo original)
+
+1. Descarga e instala **Docker Desktop for Windows**: https://www.docker.com/products/docker-desktop/
 2. Durante la instalación, deja marcado **Use WSL 2 instead of Hyper-V**.
 3. Abre Docker Desktop → **Settings**:
    - **General** → ✅ *Use the WSL 2 based engine*.
    - **Resources → WSL integration** → ✅ activa **Ubuntu-24.04** → *Apply & restart*.
    - (Opcional) **Kubernetes** → *Enable Kubernetes* si también usarás el cluster de Docker Desktop.
+4. No instales `docker.io` ni `docker-ce` dentro de Ubuntu: Docker Desktop ya pone el comando `docker` en tu distro.
 
-Verifícalo **desde Ubuntu**:
+> ℹ️ Docker Desktop es gratis para uso personal, educación y empresas pequeñas. En empresas grandes requiere licencia: en ese caso usa la opción B.
+
+### Opción B — Docker Engine dentro de Ubuntu (sin Docker Desktop)
+
+Requiere systemd en WSL (Ubuntu 24.04 lo trae activado). Compruébalo:
+
+```bash
+cat /etc/wsl.conf          # debe contener: [boot]  systemd=true
+```
+
+Si no aparece, agrégalo y reinicia WSL:
+
+```bash
+printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf
+# en PowerShell:  wsl --shutdown   y vuelve a abrir Ubuntu
+```
+
+Instala Docker Engine desde el repositorio oficial de Docker:
+
+```bash
+sudo apt update && sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Usar docker sin sudo y arrancarlo con WSL
+sudo usermod -aG docker $USER
+sudo systemctl enable --now docker
+```
+
+Cierra y vuelve a abrir la terminal de Ubuntu para que tome el grupo `docker`.
+
+### Verificación (ambas opciones)
 
 ```bash
 docker version        # debe mostrar Client y Server
 docker run --rm hello-world
+ls -l /var/run/docker.sock   # Floci lo necesita
 ```
 
-> ❌ Si sale `docker: command not found` o `Cannot connect to the Docker daemon`, la integración WSL no está activada para tu distro (paso 3) o Docker Desktop no está abierto.
+> ❌ `docker: command not found` o `Cannot connect to the Docker daemon`:
+> - Opción A: Docker Desktop no está abierto o la integración WSL no está activada para tu distro.
+> - Opción B: `sudo systemctl status docker`; si da `permission denied`, falta cerrar y abrir la terminal tras `usermod`.
 
 ---
 
@@ -77,24 +121,56 @@ sudo install -m 0755 kubectl /usr/local/bin/kubectl
 kubectl version --client
 ```
 
-### 3.3 CLI `floci` (opcional)
+---
 
-No es necesaria: el script levanta todo con `docker`. Solo sirve para `floci env`, `floci status` y `floci doctor`. Si la quieres, copia el binario desde el equipo original. En el original:
+## 4. Instalar Floci
+
+Floci tiene dos piezas:
+
+| Pieza | Qué es | Cómo se instala |
+|---|---|---|
+| **Emulador** | Imágenes Docker `floci/floci` (API de AWS) y `floci/floci-ui` (consola web). | `docker pull` (el script del paso 5 también las descarga si faltan). |
+| **CLI `floci`** | Binario de ayuda: `floci env`, `floci status`, `floci doctor`. | Script oficial de instalación. |
+
+### 4.1 Imágenes del emulador
 
 ```bash
-cp /usr/local/bin/floci /mnt/c/Users/Public/floci
+docker pull floci/floci:latest
+docker pull floci/floci-ui:0.7.0
+docker images | grep floci
 ```
 
-Pásalo al equipo nuevo (USB, red…) y ponlo en la misma ruta. En el nuevo:
+> 💡 Para tener exactamente la misma versión del servidor que el equipo original (2.4.0), usa su digest:
+> `docker pull floci/floci@sha256:5ee85db604c4aa74ac76e07ea5cc83086f37bb472bf3dbb97e34019e48efae9c`
+
+### 4.2 CLI `floci`
+
+Script oficial ([floci-io/floci-cli](https://github.com/floci-io/floci-cli)). Descarga el binario `floci-linux-amd64` del último release, verifica su SHA-256 y lo deja en `/usr/local/bin/floci`:
 
 ```bash
-sudo install -m 0755 /mnt/c/Users/Public/floci /usr/local/bin/floci
+curl -fsSL https://floci.io/install.sh | sh
 floci --version
 ```
 
+La última versión es la 1.0.0. Para fijar la misma que usa el equipo original y que está probada con este script (0.4.0):
+
+```bash
+curl -fsSL https://floci.io/install.sh | FLOCI_CLI_VERSION=0.4.0 sh
+```
+
+Otras opciones: `brew install floci-io/floci/floci` (si usas Homebrew en Linux), o descargar `floci-linux-amd64` a mano desde https://github.com/floci-io/floci-cli/releases.
+
+Comprueba el entorno:
+
+```bash
+floci doctor
+```
+
+> ⚠️ Instala la CLI, pero **no arranques Floci con `floci start`**: crea el contenedor sin la red `floci-net` y ECR falla con `503`. Para arrancar usa siempre el script del paso 5.
+
 ---
 
-## 4. Clonar el repo y levantar Floci
+## 5. Clonar el repo y levantar Floci
 
 ```bash
 git clone https://github.com/Leonix89cdmx/floci-aws.git ~/floci-aws
@@ -103,7 +179,7 @@ chmod +x start_aws_floci.sh
 ./start_aws_floci.sh
 ```
 
-La primera vez descarga las imágenes `floci/floci` y `floci/floci-ui`, así que puede tardar varios minutos. Al terminar debe verse:
+Si no hiciste el paso 4.1, la primera vez descarga las imágenes y tarda unos minutos. Al terminar debe verse:
 
 ```
   ✔ Floci healthy
@@ -118,7 +194,7 @@ La primera vez descarga las imágenes `floci/floci` y `floci/floci-ui`, así que
 
 ---
 
-## 5. Conectar la AWS CLI en cada terminal
+## 6. Conectar la AWS CLI en cada terminal
 
 Añádelo a `~/.bashrc` para que se cargue siempre:
 
@@ -134,13 +210,13 @@ EOF
 source ~/.bashrc
 ```
 
-Si instalaste la CLI `floci`, puedes usar en su lugar la línea `eval "$(floci env)"`.
+Con la CLI `floci` instalada, puedes usar en su lugar la línea `eval "$(floci env)"`.
 
 > ⚠️ Con esto, **todo comando `aws` va a Floci**. Para usar AWS real: `unset AWS_ENDPOINT_URL` y configura credenciales reales.
 
 ---
 
-## 6. Verificación
+## 7. Verificación
 
 ```bash
 docker inspect floci --format '{{.State.Health.Status}}'             # healthy
@@ -159,7 +235,7 @@ Abre la consola en el navegador de Windows: **http://localhost:4500**
 
 ---
 
-## 7. (Opcional) Migrar los datos del equipo original
+## 8. (Opcional) Migrar los datos del equipo original
 
 El repo **no** incluye `floci-data` porque contiene secretos. Si quieres llevarte los recursos creados (buckets, repos ECR, clusters…), cópialos a mano.
 
@@ -186,7 +262,7 @@ sudo tar xzf /mnt/c/Users/Public/floci-data.tgz -C ~
 
 ---
 
-## 8. Uso diario
+## 9. Uso diario
 
 | Acción | Comando |
 |---|---|
@@ -200,7 +276,7 @@ Los contenedores usan `--restart unless-stopped`, así que **arrancan solos con 
 
 ---
 
-## 9. Problemas frecuentes
+## 10. Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 |---|---|---|
